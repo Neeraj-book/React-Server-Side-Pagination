@@ -68,3 +68,71 @@ This section has moved here: [https://facebook.github.io/create-react-app/docs/d
 ### `npm run build` fails to minify
 
 This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+
+
+
+
+
+
+
+
+
+
+/// This is the action method to which this api works 
+
+private Expression<Func<Product, object>> GetPropertyExpression(string propertyName)
+        {
+            var parameter = Expression.Parameter(typeof(Product), "x");
+            var property = Expression.Property(parameter, propertyName);
+            var convert = Expression.Convert(property, typeof(object));
+            var lambda = Expression.Lambda<Func<Product, object>>(convert, parameter);
+            return lambda;
+        }
+
+        [HttpGet("getproduct")]
+        public async Task<IActionResult> GetProducts(int page = 1, int pageSize = 10,string? search="",string? sort="", string? column="")
+        {
+            var totalCount = await dbContext.Products.CountAsync();
+            var totalPage = (int)Math.Ceiling((decimal)totalCount / pageSize);
+
+            var query = dbContext.Products.AsQueryable();
+            if (!string.IsNullOrEmpty(search))
+            {
+                query = query.Where(x => x.Name.Contains(search) ||
+                                         x.Category.Contains(search) ||
+                                         x.Price.ToString().Contains(search) ||
+                                         x.Rating.Contains(search) ||
+                                         x.Quantity.ToString().Contains(search));
+            }
+
+            if (string.IsNullOrEmpty(column))
+            {
+                column = "Name";
+            }
+            
+            switch (sort)
+            {
+                case "desc":
+                    query = query.OrderByDescending(GetPropertyExpression(column));
+                    sort = "asc";
+                    break;
+                default:
+                    query = query.OrderBy(GetPropertyExpression(column));
+                    sort = "desc";
+                    break;
+            }
+
+            var productPerPage = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            var response = new
+            {
+                TotalCount = totalCount,
+                TotalPage = totalPage,
+                ProductPerPage = productPerPage
+            };
+
+            return Ok(response);
+        }
